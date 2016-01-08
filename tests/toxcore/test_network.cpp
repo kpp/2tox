@@ -198,42 +198,51 @@ TEST(Socket, valid)
     ASSERT_EQ(1, sock_valid(1));
 }
 
-enum expect_nc_test_behaviour {
-    nc_ok,
-    nc_fail_to_create_net,
-    nc_fail_to_send
-};
 
-class NC_Test /*NC = Networking_Core*/ : public ::testing::TestWithParam< std::tr1::tuple<
-    std::string /*local ip*/,
-    int /*local port*/,
-    std::string /*remote ip*/,
-    int /*remote port*/,
-    expect_nc_test_behaviour
-    > >
+class NC_Test /*NC = Networking_Core*/ : public ::testing::Test
 {
 public:
     Networking_Core* m_net;
-    IP m_local_ip;
+    IP_Port m_local_ip;
     IP_Port m_remote_ip;
-    expect_nc_test_behaviour m_behaviour;
 
     NC_Test() {}
     ~NC_Test() {}
 
     virtual void SetUp() {
-        ParamType params = GetParam();
-        std::string local_ip = std::tr1::get<0>(params);
-        int local_port = std::tr1::get<1>(params);
-        std::string remote_ip = std::tr1::get<2>(params);
-        int remote_port = std::tr1::get<3>(params);
-        m_behaviour = std::tr1::get<4>(params);
+        m_net = NULL;
+        ip_reset(&m_local_ip.ip);
+        ip_reset(&m_remote_ip.ip);
+    }
 
-        addr_parse_ip(local_ip.c_str(), &m_local_ip);
-        m_net = new_networking(m_local_ip, local_port);
-
-        addr_parse_ip(remote_ip.c_str(), &m_remote_ip.ip);
-        m_remote_ip.port = htons(remote_port);
+    ::testing::AssertionResult set_local_ip(const char* ip, int port) {
+        ip_reset(&m_local_ip.ip);
+        m_local_ip.port = htons(port);
+        int ret = addr_parse_ip(ip, &m_local_ip.ip);
+        return ret == 1
+              ? ::testing::AssertionSuccess() << "local ip was parsed"
+              : ::testing::AssertionFailure() << "local ip was not parsed";
+    }
+    ::testing::AssertionResult set_remote_ip(const char* ip, int port) {
+        ip_reset(&m_remote_ip.ip);
+        m_remote_ip.port = htons(port);
+        int ret = addr_parse_ip(ip, &m_remote_ip.ip);
+        return ret == 1
+              ? ::testing::AssertionSuccess() << "local ip was parsed"
+              : ::testing::AssertionFailure() << "local ip was not parsed";
+    }
+    ::testing::AssertionResult set_net() {
+        kill_networking(m_net);
+        m_net = new_networking(m_local_ip.ip, m_local_ip.port);
+        return m_net != NULL
+              ? ::testing::AssertionSuccess() << "net was created"
+              : ::testing::AssertionFailure() << "net was not created";
+    }
+    ::testing::AssertionResult send(const std::string& data) {
+        int ret = sendpacket(m_net, m_remote_ip, data.c_str(), data.length());
+        return ret == data.length()
+              ? ::testing::AssertionSuccess() << "data was sent"
+              : ::testing::AssertionFailure() << "data was not sent";
     }
 
     virtual void TearDown() {
@@ -241,27 +250,75 @@ public:
     }
 };
 
-INSTANTIATE_TEST_CASE_P(_, NC_Test, ::testing::Values(
-    std::tr1::make_tuple(std::string("127.0.0.1"), 27010, std::string("127.0.0.1"), 27011, nc_ok),
-    std::tr1::make_tuple(std::string("::ffff:127.0.0.1"), 27010, std::string("127.0.0.1"), 27011, nc_ok),
-    std::tr1::make_tuple(std::string("::"), 27010, std::string("127.0.0.1"), 27011, nc_ok),
-    std::tr1::make_tuple(std::string("127.0.0.1"), 27010, std::string("bad_ip"), 27011, nc_fail_to_send),
-    std::tr1::make_tuple(std::string("127.0.0.1"), 22, std::string("127.0.0.1"), 27011, nc_fail_to_create_net)
-));
-
-TEST_P(NC_Test, send)
+TEST_F(NC_Test, create_net)
 {
-    std::string data = "Hello world";
-    switch (m_behaviour)
     {
-        case nc_ok: {
-            ASSERT_EQ( data.length(), sendpacket(m_net, m_remote_ip, data.c_str(), data.length()) );
-        } break;
-        case nc_fail_to_send: {
-            ASSERT_EQ( -1, sendpacket(m_net, m_remote_ip, data.c_str(), data.length()) );
-        } break;
-        case nc_fail_to_create_net: {
-            ASSERT_EQ(NULL, m_net);
-        } break;
+        SCOPED_TRACE("good local ip");
+
+        ASSERT_TRUE( this->set_local_ip("127.0.0.1", 27010) );
+        ASSERT_TRUE( this->set_net() );
+
+        ASSERT_TRUE( this->set_local_ip("::ffff:127.0.0.1", 27010) );
+        ASSERT_TRUE( this->set_net() );
+
+        ASSERT_TRUE( this->set_local_ip("::", 27010) );
+        ASSERT_TRUE( this->set_net() );
+
+        ASSERT_TRUE( this->set_local_ip("0:0:0:0:0:0:0:1", 27010) );
+        ASSERT_TRUE( this->set_net() );
+    }
+    {
+        SCOPED_TRACE("bad local ip");
+
+        ASSERT_FALSE( this->set_local_ip("asd", 27010) );
+        ASSERT_FALSE( this->set_net() );
+    }
+}
+
+TEST_F(NC_Test, send)
+{
+    {
+        SCOPED_TRACE("good local ipv4");
+
+        ASSERT_TRUE( this->set_local_ip("127.0.0.1", 27010) );
+        ASSERT_TRUE( this->set_net() );
+
+        {
+            SCOPED_TRACE("good remote ipv6");
+            ASSERT_TRUE( this->set_remote_ip("::ffff:127.0.0.1", 27011) );
+            ASSERT_FALSE( this->send("hello world") );
+        }
+        {
+            SCOPED_TRACE("good remote ipv4");
+            ASSERT_TRUE( this->set_remote_ip("127.0.0.1", 27011) );
+            ASSERT_TRUE( this->send("hello world") );
+        }
+        {
+            SCOPED_TRACE("bad remote");
+            ASSERT_FALSE( this->set_remote_ip("asd", 27011) );
+            ASSERT_FALSE( this->send("hello world") );
+        }
+    }
+    {
+        SCOPED_TRACE("good local ipv6");
+
+        ASSERT_TRUE( this->set_local_ip("::ffff:127.0.0.1", 27010) );
+        ASSERT_TRUE( this->set_net() );
+
+        {
+            SCOPED_TRACE("good remote ipv6");
+            ASSERT_TRUE( this->set_remote_ip("::ffff:127.0.0.1", 27011) );
+            ASSERT_TRUE( this->send("hello world") );
+        }
+        {
+            SCOPED_TRACE("good remote ipv4");
+            ASSERT_TRUE( this->set_remote_ip("127.0.0.1", 27011) );
+            ASSERT_TRUE( this->send("hello world") );
+        }
+        {
+            SCOPED_TRACE("bad remote");
+            ASSERT_FALSE( this->set_remote_ip("asd", 27011) );
+            // ASSERT_FALSE( this->send("hello world") ); // FIXME
+        }
     }
 }
