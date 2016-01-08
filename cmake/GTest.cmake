@@ -6,7 +6,6 @@ include(CheckCXXSourceCompiles)
 include(CMakePushCheckState)
 include(ExternalProject)
 include(FindPackageMessage)
-include(CMakeExpandImportedTargets)
 
 function(add_gtest_as_external)
     set(gtest_local_dir "/usr/src/gtest/")
