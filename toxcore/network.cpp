@@ -262,7 +262,7 @@ int Socket::recvfrom(IP_Port* ip_port, void* data, uint32_t* length, size_t max_
     *ip_port = IP_Port();
     *length = 0;
 
-    struct sockaddr_storage addr;
+    sockaddr_storage addr;
     socklen_t addrlen = sizeof(addr);
 
     int fail_or_len = ::recvfrom(fd, data, max_len, flags, (sockaddr*) &addr, &addrlen);
@@ -316,7 +316,7 @@ Networking_Core::Networking_Core() :
 Networking_Core::~Networking_Core()
 {
     if (family != 0)
-        sock.kill();
+        kill_sock(sock.fd);
 }
 
 void Networking_Core::poll() const
@@ -748,7 +748,7 @@ int addr_resolve(const char *address, IP* to, IP* extra)
                     }
                 } else if (!(rc & 2)) { /* AF_UNSPEC requested, store away */
                     if (walker->ai_addrlen == sizeof(sockaddr_in6)) {
-                        struct sockaddr_in6* addr = (sockaddr_in6*) walker->ai_addr;
+                        sockaddr_in6* addr = (sockaddr_in6*) walker->ai_addr;
                         ip6.in6_addr = addr->sin6_addr;
                         rc |= 2;
                     }

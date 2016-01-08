@@ -102,6 +102,8 @@ TEST(IP, isset)
 {
     IP ip;
 
+    ASSERT_EQ(0, ip_isset(NULL));
+
     ip_reset(&ip);
     ASSERT_EQ(0, ip_isset(&ip));
 
@@ -135,6 +137,7 @@ TEST(IP, equal)
 
     addr_parse_ip("::ffff:127.0.0.1", &ip2);
     ASSERT_EQ(1, ip_equal(&ip1, &ip2));
+    ASSERT_EQ(1, ip_equal(&ip2, &ip1));
 
     addr_parse_ip("::1", &ip2);
     ASSERT_EQ(0, ip_equal(&ip1, &ip2));
@@ -146,6 +149,47 @@ TEST(IP, equal)
     ASSERT_EQ(0, ip_equal(&ip1, &ip2));
 }
 
+TEST(IP, copy)
+{
+    {
+        SCOPED_TRACE("null+null does not produce segfault");
+        ip_copy(NULL, NULL);
+    }
+    {
+        SCOPED_TRACE("null source does not affect destination");
+        IP ip;
+        ip_init(&ip, false);
+        ASSERT_EQ(1, ip_isset(&ip));
+        ip_copy(&ip, NULL);
+        ASSERT_EQ(1, ip_isset(&ip));
+    }
+    {
+        SCOPED_TRACE("null destination does not affect source");
+        IP ip;
+        ip_init(&ip, false);
+        ASSERT_EQ(1, ip_isset(&ip));
+        ip_copy(NULL, &ip);
+        ASSERT_EQ(1, ip_isset(&ip));
+    }
+    {
+        SCOPED_TRACE("non null+ non null is ok");
+        IP ip_src, ip_dst;
+        ip_reset(&ip_dst);
+        addr_parse_ip("127.0.0.1", &ip_src);
+
+        ip_copy(&ip_dst, &ip_src);
+        ASSERT_EQ(1, ip_equal(&ip_src, &ip_dst));
+    }
+    {
+        SCOPED_TRACE("copy into self is ok");
+        IP ip;
+        addr_parse_ip("127.0.0.1", &ip);
+
+        ip_copy(&ip, &ip);
+        ASSERT_EQ(1, ip_isset(&ip));
+        ASSERT_EQ(1, ip_equal(&ip, &ip));
+    }
+}
 
 TEST(Socket, valid)
 {
@@ -199,6 +243,8 @@ public:
 
 INSTANTIATE_TEST_CASE_P(_, NC_Test, ::testing::Values(
     std::tr1::make_tuple(std::string("127.0.0.1"), 27010, std::string("127.0.0.1"), 27011, nc_ok),
+    std::tr1::make_tuple(std::string("::ffff:127.0.0.1"), 27010, std::string("127.0.0.1"), 27011, nc_ok),
+    std::tr1::make_tuple(std::string("::"), 27010, std::string("127.0.0.1"), 27011, nc_ok),
     std::tr1::make_tuple(std::string("127.0.0.1"), 27010, std::string("bad_ip"), 27011, nc_fail_to_send),
     std::tr1::make_tuple(std::string("127.0.0.1"), 22, std::string("127.0.0.1"), 27011, nc_fail_to_create_net)
 ));
