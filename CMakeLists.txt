@@ -1,0 +1,53 @@
+cmake_minimum_required(VERSION 2.8.4)
+
+project(2tox C CXX)
+enable_testing()
+
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
+
+find_package(Threads REQUIRED)
+
+include(CMakeDependentOption)
+include(FeatureSummary)
+include(GTest)
+
+option(BUILD_TESTING "Build the testing tree." ON)
+ADD_FEATURE_INFO(BUILD_TESTING BUILD_TESTING "Build unit tests")
+
+FEATURE_SUMMARY(WHAT ALL)
+
+#
+
+include_directories(${CMAKE_SOURCE_DIR})
+add_subdirectory(toxcore/)
+add_subdirectory(toxdns/)
+add_subdirectory(toxencryptsave/)
+add_subdirectory(toxav/)
+add_subdirectory(tests/)
+
+# uninstall target
+
+configure_file("${CMAKE_SOURCE_DIR}/cmake/uninstall.cmake.in" uninstall.cmake @ONLY)
+add_custom_target(uninstall COMMAND ${CMAKE_COMMAND} -P uninstall.cmake)
+
+# package info
+
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "2tox, reimplementation of toxcore")
+set(CPACK_DEBIAN_PACKAGE_DESCRIPTION # The format of Description: http://www.debian.org/doc/debian-policy/ch-controlfields.html#s-f-Description
+"2tox
+ Reimplementation of toxcore
+")
+set(CPACK_PACKAGE_CONTACT "Roman Proskuryakov <humbug@deeptown.org>")
+set(CPACK_PACKAGE_VERSION_MAJOR "0")
+set(CPACK_PACKAGE_VERSION_MINOR "0")
+set(CPACK_PACKAGE_VERSION_PATCH "0")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
+set(CPACK_SOURCE_GENERATOR "TGZ")
+set(CPACK_SOURCE_IGNORE_FILES "build/" "\\\\.kdev.*" "\\\\.git.*" "\\\\.hgignore")
+set(CPACK_STRIP_FILES "")
+
+set(CPACK_GENERATOR "DEB")
+set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "https://github.com/kpp/2tox")
+set(CPACK_DEBIAN_PACKAGE_DEPENDS "")
+
+include(CPack)
