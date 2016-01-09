@@ -103,7 +103,6 @@ struct IP_Port {
     uint16_t port;
 
     explicit IP_Port();
-    explicit IP_Port(const IP& p_ip, uint16_t p_port);
 
     bool operator==(const IP_Port& other) const;
     bool isset() const;

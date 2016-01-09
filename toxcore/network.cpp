@@ -17,30 +17,13 @@
 #include <assert.h>
 #include <algorithm>
 
-static void unix_time_update()
-{
-    // FIXME
-}
+static void unix_time_update() { /* FIXME */ }
 
-static uint64_t current_time_actual(void)
-{
-    // FIXME
-    return 0;
-}
+static uint64_t current_time_actual(void) { /* FIXME */ return 0; }
 
-int networking_at_startup(void)
-{
-    // FIXME
-    return 0;
-}
+int networking_at_startup(void) { /* FIXME */ return 0; }
 
-
-
-uint64_t current_time_monotonic(void)
-{
-    // FIXME
-    return 0;
-}
+uint64_t current_time_monotonic(void) { /* FIXME */ return 0; }
 
 bool IP4::operator==(const IP4& other) const {
     return in_addr.s_addr == other.in_addr.s_addr;
@@ -124,8 +107,6 @@ bool IP::isset() const {
 
 
 IP_Port::IP_Port() : ip(), port() { }
-
-IP_Port::IP_Port(const IP& p_ip, uint16_t p_port) : ip(p_ip), port(p_port) { }
 
 bool IP_Port::operator==(const IP_Port& other) const {
     return port == other.port && ip == other.ip;
