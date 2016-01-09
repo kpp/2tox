@@ -235,6 +235,9 @@ int Socket::sendto(uint8_t socket_family, IP_Port target, const void* data, size
     if (socket_family == 0) /* Socket not initialized */
         return -1;
 
+    if (!target.isset())
+        return -1;
+
     /* socket AF_INET, but target IP NOT: can't send */
     if (socket_family == AF_INET && target.ip.family != AF_INET)
         return -1;
@@ -574,13 +577,6 @@ int ip_equal(const IP* a, const IP* b) {
     return *a == *b;
 }
 
-int ipport_equal(const IP_Port* a, const IP_Port* b) {
-    if (!a || !b || !a->port)
-        return 0;
-
-    return *a == *b;
-}
-
 void ip_reset(IP* ip) {
     if (!ip)
         return;
@@ -602,20 +598,27 @@ int ip_isset(const IP* ip) {
     return ip->isset();
 }
 
-int ipport_isset(const IP_Port* ipport)
-{
-    if (!ipport || !ipport->port)
-        return 0;
-
-    return ipport->ip.isset();
-}
-
 void ip_copy(IP* target, const IP* source)
 {
     if (!source || !target)
         return;
 
     *target = *source;
+}
+
+int ipport_equal(const IP_Port* a, const IP_Port* b) {
+    if (!a || !b || !a->port)
+        return 0;
+
+    return *a == *b;
+}
+
+int ipport_isset(const IP_Port* ipport)
+{
+    if (!ipport || !ipport->port)
+        return 0;
+
+    return ipport->ip.isset();
 }
 
 void ipport_copy(IP_Port* target, const IP_Port* source)
