@@ -213,8 +213,11 @@ int Socket::bind(const IP_Port& ip_port) const
 
 int Socket::sendto(uint8_t socket_family, IP_Port target, const void* data, size_t length, int flags) const
 {
-    if (socket_family == 0) /* Socket not initialized */
+    if (socket_family == 0 || !(socket_family == AF_INET || socket_family == AF_INET6)) {
+        /* Socket not initialized */
+        /* Unknown address type*/
         return -1;
+    }
 
     if (!target.isset())
         return -1;
@@ -232,9 +235,6 @@ int Socket::sendto(uint8_t socket_family, IP_Port target, const void* data, size
     } else if (socket_family == AF_INET) {
         addr = IP_Port::to_addr_4(target);
         addrsize = sizeof(sockaddr_in);
-    } else {
-        /* unknown address type*/
-        return -1;
     }
 
     int res = ::sendto(fd, data, length, flags, reinterpret_cast<sockaddr*>(&addr), addrsize);
