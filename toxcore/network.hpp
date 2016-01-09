@@ -133,11 +133,30 @@ struct Socket {
 typedef unsigned int sock_t;
 
 
-#define SIZE_IP4 4
-#define SIZE_IP6 16
-#define SIZE_IP (1 + SIZE_IP6)
-#define SIZE_PORT 2
-#define SIZE_IPPORT (SIZE_IP + SIZE_PORT)
+/* Function to receive data, ip and port of sender is put into ip_port.
+ * Packet data is put into data.
+ * Packet length is put into length.
+ */
+typedef int (*packet_handler_callback)(void* object, IP_Port ip_port, const void* data, uint16_t len);
+
+struct Packet_Handler {
+    packet_handler_callback function;
+    void* object;
+};
+
+struct Networking_Core {
+    Packet_Handler packethandlers[256];
+
+    sa_family_t family;
+    uint16_t port;
+    /* Our UDP socket. */
+    Socket sock;
+
+    Networking_Core();
+    ~Networking_Core();
+
+    void poll() const;
+};
 
 #define TOX_ENABLE_IPV6_DEFAULT 1
 
@@ -246,31 +265,6 @@ int addr_resolve(const char* address, IP* to, IP* extra);
  *  returns 0 on failure
  */
 int addr_resolve_or_parse_ip(const char* address, IP* to, IP* extra);
-
-/* Function to receive data, ip and port of sender is put into ip_port.
- * Packet data is put into data.
- * Packet length is put into length.
- */
-typedef int (*packet_handler_callback)(void* object, IP_Port ip_port, const uint8_t* data, uint16_t len);
-
-struct Packet_Handler {
-    packet_handler_callback function;
-    void* object;
-};
-
-struct Networking_Core {
-    Packet_Handler packethandlers[256];
-
-    sa_family_t family;
-    uint16_t port;
-    /* Our UDP socket. */
-    Socket sock;
-
-    Networking_Core();
-    ~Networking_Core();
-
-    void poll() const;
-};
 
 /* Run this before creating sockets.
  *
