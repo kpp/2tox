@@ -610,50 +610,46 @@ void ipport_copy(IP_Port* target, const IP_Port* source)
     *target = *source;
 }
 
-static char addresstext[96];
-const char* ip_ntoa(const IP* ip)
-{
-    if (ip) {
-        if (ip->family == AF_INET) {
-            /* returns standard quad-dotted notation */
-            in_addr* addr = (in_addr*) &ip->ip4;
-
-            addresstext[0] = 0;
-            inet_ntop(ip->family, addr, addresstext, sizeof(addresstext));
-        } else if (ip->family == AF_INET6) {
-            /* returns hex-groups enclosed into square brackets */
-            in6_addr *addr = (in6_addr*) &ip->ip6;
-
-            addresstext[0] = '[';
-            inet_ntop(ip->family, addr, &addresstext[1], sizeof(addresstext) - 3);
-            size_t len = strlen(addresstext);
-            addresstext[len] = ']';
-            addresstext[len + 1] = 0;
-        } else
-            snprintf(addresstext, sizeof(addresstext), "(IP invalid, family %u)", ip->family);
-    } else
-        snprintf(addresstext, sizeof(addresstext), "(IP invalid: NULL)");
-
-    /* brute force protection against lacking termination */
-    addresstext[sizeof(addresstext) - 1] = 0;
-    return addresstext;
-}
-
 int ip_parse_addr(const IP* ip, char* address, size_t length)
 {
     if (!address || !ip) {
         return 0;
     }
 
+    void* addr = NULL;
     if (ip->family == AF_INET) {
-        in_addr* addr = (in_addr*) &ip->ip4;
-        return inet_ntop(ip->family, addr, address, length) != NULL;
+        addr = (in_addr*) &ip->ip4;
     } else if (ip->family == AF_INET6) {
-        in6_addr* addr = (in6_addr*) &ip->ip6;
-        return inet_ntop(ip->family, addr, address, length) != NULL;
+        addr = (in6_addr*) &ip->ip6;
+    }
+    return inet_ntop(ip->family, addr, address, length) != NULL;
+}
+
+static char addresstext[96];
+const char* ip_ntoa(const IP* ip)
+{
+    if (!ip) {
+        snprintf(addresstext, sizeof(addresstext), "(IP invalid: NULL)");
+        return addresstext;
     }
 
-    return 0;
+    char converted[INET6_ADDRSTRLEN];
+    size_t converted_size = sizeof(converted);
+    int ret = ip_parse_addr(ip, converted, converted_size);
+    if (ret == 0) {
+        snprintf(addresstext, sizeof(addresstext), "(IP invalid, %s)", strerror(errno));
+        return addresstext;
+    }
+
+    if (ip->family == AF_INET) {
+        /* returns standard quad-dotted notation */
+        snprintf(addresstext, sizeof(addresstext), "%s", converted);
+        return addresstext;
+    } else if (ip->family == AF_INET6) {
+        /* returns hex-groups enclosed into square brackets */
+        snprintf(addresstext, sizeof(addresstext), "[%s]", converted);
+        return addresstext;
+    }
 }
 
 int addr_parse_ip(const char *address, IP *to)
@@ -680,7 +676,7 @@ int addr_parse_ip(const char *address, IP *to)
     return 0;
 }
 
-int addr_resolve(const char *address, IP* to, IP* extra)
+int addr_resolve(const char* address, IP* to, IP* extra)
 {
     if (!address || !to)
         return 0;
@@ -761,7 +757,7 @@ int addr_resolve(const char *address, IP* to, IP* extra)
     return rc;
 }
 
-int addr_resolve_or_parse_ip(const char *address, IP *to, IP *extra)
+int addr_resolve_or_parse_ip(const char* address, IP* to, IP* extra)
 {
     if (!addr_resolve(address, to, extra))
         if (!addr_parse_ip(address, to))

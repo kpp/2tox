@@ -81,7 +81,7 @@ TEST(IP, to_string)
         }
     }
     {
-        SCOPED_TRACE("null ptr");
+        SCOPED_TRACE("bad args");
         IP ip;
         ip_init(&ip, false);
         char converted[INET6_ADDRSTRLEN];
@@ -90,6 +90,10 @@ TEST(IP, to_string)
         ASSERT_EQ(0, ip_parse_addr(NULL, converted, converted_size));
         ASSERT_EQ(0, ip_parse_addr(&ip, NULL, converted_size));
         ASSERT_EQ(0, ip_parse_addr(NULL, NULL, converted_size));
+
+        ASSERT_EQ(1, ip_parse_addr(&ip, converted, converted_size));
+        ip_reset(&ip);
+        ASSERT_EQ(0, ip_parse_addr(&ip, converted, converted_size));
     }
     {
         SCOPED_TRACE("good ips");
@@ -108,6 +112,75 @@ TEST(IP, to_string)
             ASSERT_EQ(1, ip_parse_addr(&ip, converted, sizeof(converted)) );
             ASSERT_EQ(ip_str, converted);
         }
+    }
+}
+
+TEST(IP, ntoa)
+{
+    ASSERT_STREQ("(IP invalid: NULL)", ip_ntoa(NULL));
+
+    IP ip;
+
+    ip_reset(&ip);
+    ASSERT_STREQ("(IP invalid, Address family not supported by protocol)", ip_ntoa(&ip));
+
+    addr_parse_ip("127.0.0.1", &ip);
+    ASSERT_STREQ("127.0.0.1", ip_ntoa(&ip));
+
+    addr_parse_ip("::1", &ip);
+    ASSERT_STREQ("[::1]", ip_ntoa(&ip));
+}
+
+TEST(IP, resolve)
+{
+    {
+        SCOPED_TRACE("bad args");
+        IP ipv6, ipv4;
+        ip_init(&ipv6, true);
+        ip_init(&ipv4, false);
+        ASSERT_EQ(0, addr_resolve_or_parse_ip(NULL, NULL, NULL) );
+        ASSERT_EQ(0, addr_resolve_or_parse_ip(NULL, &ipv6, &ipv4) );
+        ASSERT_EQ(0, addr_resolve_or_parse_ip("127.0.0.1", NULL, &ipv4) );
+        ASSERT_EQ(0, addr_resolve_or_parse_ip("127.0.0.1", NULL, NULL) );
+        ASSERT_EQ(0, addr_resolve_or_parse_ip("hello world", &ipv6, &ipv4) );
+    }
+    {
+        SCOPED_TRACE("expect ipv4 for ipv4 host");
+        IP ipv4;
+        ip_init(&ipv4, false);
+        ASSERT_EQ(1, addr_resolve_or_parse_ip("localhost", &ipv4, NULL) );
+        ASSERT_STREQ("127.0.0.1", ip_ntoa(&ipv4));
+    }
+    {
+        SCOPED_TRACE("expect ipv6 for ipv6 host");
+        IP ip;
+        ip_init(&ip, true);
+        ASSERT_EQ(1, addr_resolve_or_parse_ip("ip6-localhost", &ip, NULL) );
+        ASSERT_STREQ("[::1]", ip_ntoa(&ip));
+    }
+    {
+        SCOPED_TRACE("expect ipv6 for ipv4 host");
+        IP ipv6;
+        ip_init(&ipv6, true);
+        //ASSERT_EQ(0, addr_resolve_or_parse_ip("localhost", &ipv6, NULL) ); //FIXME depends on resolver...
+    }
+    {
+        SCOPED_TRACE("ipv6 for ipv6 host + extra(unused)");
+        IP ipv6, ipv4;
+        ip_init(&ipv6, true);
+        ip_init(&ipv4, false);
+        ASSERT_EQ(1, addr_resolve_or_parse_ip("::ffff:134.23.254.1", &ipv6, &ipv4) );
+        ASSERT_STREQ("[::ffff:134.23.254.1]", ip_ntoa(&ipv6));
+        ASSERT_EQ(1, ip_isset(&ipv4)); // FIXME should be 0
+    }
+    {
+        SCOPED_TRACE("both ipv4 and ipv6 for ipv6 host");
+        IP ipv6, ipv4;
+        ip_reset(&ipv6);
+        ip_reset(&ipv4);
+        ASSERT_EQ(1, addr_resolve_or_parse_ip("ip6-localhost", &ipv6, &ipv4) );
+        ASSERT_STREQ("[::1]", ip_ntoa(&ipv6));
+        ASSERT_STRNE("127.0.0.1", ip_ntoa(&ipv4)); // FIXME should be 127.0.0.1
     }
 }
 
