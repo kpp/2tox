@@ -372,7 +372,7 @@ int set_socket_dualstack(sock_t sock)
     return socket.set_dualstack();
 }
 
-int sendpacket(Networking_Core* net, IP_Port ip_port, const void* data, uint16_t length)
+int sendpacket(Networking_Core* net, IP_Port ip_port, const uint8_t* data, uint16_t length)
 {
     return net->sock.sendto(net->family, ip_port, data, length, /*flags*/ 0);
 }

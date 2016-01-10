@@ -481,12 +481,12 @@ public:
             IP_Port target_ip;
             target_ip.port = htons(target.m_port);
             target_ip.ip = target.m_ip;
-            int ret = sendpacket(m_net, target_ip, data.c_str(), data.length());
+            int ret = sendpacket(m_net, target_ip, reinterpret_cast<const uint8_t*>(data.c_str()), data.length());
             return ret == data.length()
                 ? ::testing::AssertionSuccess() << "data was sent"
                 : ::testing::AssertionFailure() << "data was not sent";
         }
-        static int on_any_packet_received(void* object, IP_Port ip_port, const void* data, uint16_t len) {
+        static int on_any_packet_received(void* object, IP_Port ip_port, const uint8_t* data, uint16_t len) {
             client* self = reinterpret_cast<client*>( object );
             self->m_received_ip = ip_port;
             self->m_received_data = std::string(reinterpret_cast<const char*>(data), len);

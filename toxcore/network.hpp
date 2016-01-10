@@ -136,7 +136,7 @@ typedef unsigned int sock_t;
  * Packet data is put into data.
  * Packet length is put into length.
  */
-typedef int (*packet_handler_callback)(void* object, IP_Port ip_port, const void* data, uint16_t len);
+typedef int (*packet_handler_callback)(void* object, IP_Port ip_port, const uint8_t* data, uint16_t len);
 
 struct Packet_Handler {
     packet_handler_callback function;
@@ -317,7 +317,7 @@ uint64_t current_time_monotonic(void);
 /* Basic network functions: */
 
 /* Function to send packet(data) of length to ip_port. */
-int sendpacket(Networking_Core* net, IP_Port ip_port, const void* data, uint16_t length);
+int sendpacket(Networking_Core* net, IP_Port ip_port, const uint8_t* data, uint16_t length);
 
 /* Function to call when packet beginning with byte=id is received. */
 void networking_registerhandler(Networking_Core* net, uint8_t id, packet_handler_callback cb, void* object);
