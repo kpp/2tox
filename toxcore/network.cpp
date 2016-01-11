@@ -53,10 +53,10 @@ bool IP::operator==(const IP& other) const
 {
     const IP& self = *this;
 
-    bool self_v4 = self.family == AF_INET;
-    bool self_v6 = self.family == AF_INET6;
-    bool other_v4 = other.family == AF_INET;
-    bool other_v6 = other.family == AF_INET6;
+    const bool self_v4 = self.family == AF_INET;
+    const bool self_v6 = self.family == AF_INET6;
+    const bool other_v4 = other.family == AF_INET;
+    const bool other_v6 = other.family == AF_INET6;
 
     if (self_v4 && other_v4)
         return self.ip4 == other.ip4;
@@ -120,7 +120,7 @@ sockaddr_storage IP_Port::to_addr_4(const IP_Port& self)
 {
     assert(self.ip.family == AF_INET);
     sockaddr_storage storage;
-    sockaddr_in* addr = reinterpret_cast<sockaddr_in*>( &storage );
+    sockaddr_in* const addr = reinterpret_cast<sockaddr_in*>( &storage );
 
     addr->sin_family = AF_INET;
     addr->sin_addr = self.ip.ip4.in_addr;
@@ -134,7 +134,7 @@ sockaddr_storage IP_Port::to_addr_6(const IP_Port& self)
     assert(self.ip.family != 0);
     const IP6& ip_addr = (self.ip.family == AF_INET6) ? self.ip.ip6 : self.ip.ip4.to_ip6();
     sockaddr_storage storage;
-    sockaddr_in6* addr = reinterpret_cast<sockaddr_in6*>( &storage );
+    sockaddr_in6* const addr = reinterpret_cast<sockaddr_in6*>( &storage );
 
     addr->sin6_family = AF_INET6;
     addr->sin6_port = self.port;
@@ -149,12 +149,12 @@ IP_Port IP_Port::from_addr(const sockaddr_storage& addr)
 {
     IP_Port ip_port;
     if (addr.ss_family == AF_INET) {
-        sockaddr_in* addr_in = (sockaddr_in*) &addr;
+        const sockaddr_in* const addr_in = (sockaddr_in*) &addr;
         ip_port.ip.family = addr_in->sin_family;
         ip_port.ip.ip4.in_addr = addr_in->sin_addr;
         ip_port.port = addr_in->sin_port;
     } else if (addr.ss_family == AF_INET6) {
-        sockaddr_in6* addr_in = (sockaddr_in6*) &addr;
+        const sockaddr_in6* const addr_in = (sockaddr_in6*) &addr;
         ip_port.ip.family = addr_in->sin6_family;
         ip_port.ip.ip6.in6_addr = addr_in->sin6_addr;
         ip_port.port = addr_in->sin6_port;
@@ -173,13 +173,37 @@ Socket::Socket() : fd() { }
 Socket::Socket(sa_family_t family, size_t tx_rx_buff_size)
     : fd()
 {
-    fd = socket(family, SOCK_DGRAM, IPPROTO_UDP);
-    setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (void*) &tx_rx_buff_size, sizeof(tx_rx_buff_size));
-    setsockopt(fd, SOL_SOCKET, SO_SNDBUF, (void*) &tx_rx_buff_size, sizeof(tx_rx_buff_size));
+    int ret;
+    ret = socket(family, SOCK_DGRAM, IPPROTO_UDP);
+    this->fd = ret;
+    if (ret == -1) {
+        // TODO log
+        return;
+    }
+    ret = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, (void*) &tx_rx_buff_size, sizeof(tx_rx_buff_size));
+    if (ret == -1) {
+        // TODO log
+        kill_sock(fd);
+        fd = -1;
+        return;
+    }
+    ret = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, (void*) &tx_rx_buff_size, sizeof(tx_rx_buff_size));
+    if (ret == -1) {
+        // TODO log
+        kill_sock(fd);
+        fd = -1;
+        return;
+    }
 
     /* Enable broadcast on socket */
     int broadcast = 1;
-    setsockopt(fd, SOL_SOCKET, SO_BROADCAST, (char *)&broadcast, sizeof(broadcast));
+    ret = setsockopt(fd, SOL_SOCKET, SO_BROADCAST, (char *)&broadcast, sizeof(broadcast));
+    if (ret == -1) {
+        // TODO log
+        kill_sock(fd);
+        fd = -1;
+        return;
+    }
 }
 
 
@@ -206,6 +230,8 @@ int Socket::bind(const IP_Port& ip_port) const
     } else if (ip_port.ip.family == AF_INET6) {
         addr = IP_Port::to_addr_6( ip_port );
         addrsize = sizeof(sockaddr_in6);
+    } else {
+        addrsize = 0;
     }
     return ::bind(fd, (sockaddr*) &addr, addrsize);
 }
@@ -237,8 +263,7 @@ int Socket::sendto(uint8_t socket_family, IP_Port target, const void* data, size
         addrsize = sizeof(sockaddr_in);
     }
 
-    int res = ::sendto(fd, data, length, flags, reinterpret_cast<sockaddr*>(&addr), addrsize);
-    return res;
+    return ::sendto(fd, data, length, flags, reinterpret_cast<sockaddr*>(&addr), addrsize);
 }
 
 int Socket::recvfrom(IP_Port* ip_port, void* data, uint32_t* length, size_t max_len, int flags) const
@@ -249,17 +274,17 @@ int Socket::recvfrom(IP_Port* ip_port, void* data, uint32_t* length, size_t max_
     sockaddr_storage addr;
     socklen_t addrlen = sizeof(addr);
 
-    int fail_or_len = ::recvfrom(fd, data, max_len, flags, (sockaddr*) &addr, &addrlen);
-
-    if (fail_or_len < 0) {
+    const int ret = ::recvfrom(fd, data, max_len, flags, (sockaddr*) &addr, &addrlen);
+    if (ret == -1) {
         return -1; /* Nothing received. */
     }
+    *length = ret;
 
-    *length = fail_or_len;
     if (addr.ss_family == AF_INET || addr.ss_family == AF_INET6) {
         *ip_port = IP_Port::from_addr(addr);
-    } else
+    } else {
         return -1;
+    }
 
     return 0;
 }
@@ -281,13 +306,13 @@ bool Socket::set_dualstack() const
 {
     int ipv6only = 0;
     socklen_t optsize = sizeof(ipv6only);
-    int res = getsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (void*) &ipv6only, &optsize);
+    const int ret = getsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (void*) &ipv6only, &optsize);
 
-    if ((res == 0) && (ipv6only == 0))
+    if ((ret == 0) && (ipv6only == 0))
         return true;
 
     ipv6only = false;
-    return (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (void*) &ipv6only, sizeof(ipv6only)) == 0);
+    return setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (void*) &ipv6only, sizeof(ipv6only)) == 0;
 }
 
 
@@ -469,7 +494,14 @@ Networking_Core* new_networking_ex(IP ip, uint16_t port_from, uint16_t port_to, 
     }
 
     if (ip.family == AF_INET6) {
-        net_socket.set_dualstack();
+        if ( !net_socket.set_dualstack() ) {
+            kill_networking(net);
+
+            if (error)
+                *error = 1;
+
+            return NULL;
+        }
 
         ipv6_mreq mreq;
         memset(&mreq, 0, sizeof(mreq));
@@ -478,7 +510,15 @@ Networking_Core* new_networking_ex(IP ip, uint16_t port_from, uint16_t port_to, 
         mreq.ipv6mr_multiaddr.s6_addr[15] = 0x01;
         mreq.ipv6mr_interface = 0;
 
-        setsockopt(net_socket.fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
+        const int ret = setsockopt(net_socket.fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
+        if ( ret == -1 ) {
+            kill_networking(net);
+
+            if (error)
+                *error = 1;
+
+            return NULL;
+        }
 
        // LOGGER_DEBUG(res < 0 ? "Failed to activate local multicast membership. (%u, %s)" :
        //              "Local multicast group FF02::1 joined successfully", errno, strerror(errno) );
@@ -511,9 +551,8 @@ Networking_Core* new_networking_ex(IP ip, uint16_t port_from, uint16_t port_to, 
             port_to_try = port_from;
         ip_port.port = htons(port_to_try);
 
-        int res = net_socket.bind(ip_port);
-
-        if (!res) {
+        const int ret = net_socket.bind(ip_port);
+        if (!ret) {
             net->port = ip_port.port;
 
             //LOGGER_DEBUG("Bound successfully to %s:%u", ip_ntoa(&ip), ntohs(temp->port));
@@ -633,7 +672,7 @@ const char* ip_ntoa(const IP* ip)
 
     char converted[INET6_ADDRSTRLEN];
     size_t converted_size = sizeof(converted);
-    int ret = ip_parse_addr(ip, converted, converted_size);
+    const int ret = ip_parse_addr(ip, converted, converted_size);
     if (ret == 0) {
         snprintf(addresstext, sizeof(addresstext), "(IP invalid, %s)", strerror(errno));
         return addresstext;
@@ -647,6 +686,9 @@ const char* ip_ntoa(const IP* ip)
         /* returns hex-groups enclosed into square brackets */
         snprintf(addresstext, sizeof(addresstext), "[%s]", converted);
         return addresstext;
+    } else {
+        // should never happen because ip_parse_addr would have handled it
+        return "";
     }
 }
 
@@ -679,21 +721,18 @@ int addr_resolve(const char* address, IP* to, IP* extra)
     if (!address || !to)
         return 0;
 
-    sa_family_t family = to->family;
+    if (networking_at_startup() != 0)
+        return 0;
 
-    addrinfo *server = NULL;
-    addrinfo *walker = NULL;
-    addrinfo  hints;
-    int              rc;
+    const sa_family_t family = to->family;
 
+    addrinfo hints;
     memset(&hints, 0, sizeof(hints));
     hints.ai_family   = family;
     hints.ai_socktype = SOCK_DGRAM; // type of socket Tox uses.
 
-    if (networking_at_startup() != 0)
-        return 0;
-
-    rc = getaddrinfo(address, NULL, &hints, &server);
+    addrinfo* server = NULL;
+    int rc = getaddrinfo(address, NULL, &hints, &server);
 
     // Lookup failed.
     if (rc != 0) {
@@ -703,15 +742,15 @@ int addr_resolve(const char* address, IP* to, IP* extra)
     IP4 ip4;
     IP6 ip6;
 
-    for (walker = server; (walker != NULL) && (rc != 3); walker = walker->ai_next) {
+    for (const addrinfo* walker = server; (walker != NULL) && (rc != 3); walker = walker->ai_next) {
         switch (walker->ai_family) {
             case AF_INET: {
                 if (walker->ai_family == family) { /* AF_INET requested, done */
-                    sockaddr_in* addr = (sockaddr_in*) walker->ai_addr;
+                    const sockaddr_in* const addr = (sockaddr_in*) walker->ai_addr;
                     to->ip4.in_addr = addr->sin_addr;
                     rc = 3;
                 } else if (!(rc & 1)) { /* AF_UNSPEC requested, store away */
-                    sockaddr_in* addr = (sockaddr_in*) walker->ai_addr;
+                    const sockaddr_in* const addr = (sockaddr_in*) walker->ai_addr;
                     ip4.in_addr = addr->sin_addr;
                     rc |= 1;
                 }
@@ -720,13 +759,13 @@ int addr_resolve(const char* address, IP* to, IP* extra)
             case AF_INET6: {
                 if (walker->ai_family == family) { /* AF_INET6 requested, done */
                     if (walker->ai_addrlen == sizeof(sockaddr_in6)) {
-                        sockaddr_in6* addr = (sockaddr_in6*) walker->ai_addr;
+                        const sockaddr_in6* const addr = (sockaddr_in6*) walker->ai_addr;
                         to->ip6.in6_addr = addr->sin6_addr;
                         rc = 3;
                     }
                 } else if (!(rc & 2)) { /* AF_UNSPEC requested, store away */
                     if (walker->ai_addrlen == sizeof(sockaddr_in6)) {
-                        sockaddr_in6* addr = (sockaddr_in6*) walker->ai_addr;
+                        const sockaddr_in6* const addr = (sockaddr_in6*) walker->ai_addr;
                         ip6.in6_addr = addr->sin6_addr;
                         rc |= 2;
                     }

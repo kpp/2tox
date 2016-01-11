@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include <toxcore/network.hpp>
+#include <errno.h>
 
 TEST(IP, from_string)
 {
@@ -549,9 +550,11 @@ public:
             target_ip.port = htons(target.m_port);
             target_ip.ip = target.m_ip;
             int ret = sendpacket(m_net, target_ip, reinterpret_cast<const uint8_t*>(data.c_str()), data.length());
-            return ret == data.length()
-                ? ::testing::AssertionSuccess() << "data was sent"
-                : ::testing::AssertionFailure() << "data was not sent";
+            if (ret == -1)
+                return ::testing::AssertionFailure() << "data was not sent due to '" << strerror(errno) << "'";
+            size_t bytes_sent = ret;
+            EXPECT_EQ(data.length(), bytes_sent) << "not all of the data was sent";
+            return ::testing::AssertionSuccess() << "data was sent";
         }
         static int on_any_packet_received(void* object, IP_Port ip_port, const uint8_t* data, uint16_t len) {
             client* self = reinterpret_cast<client*>( object );
