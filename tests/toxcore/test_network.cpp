@@ -142,7 +142,7 @@ TEST(IP, resolve)
         ASSERT_EQ(0, addr_resolve_or_parse_ip(NULL, &ipv6, &ipv4) );
         ASSERT_EQ(0, addr_resolve_or_parse_ip("127.0.0.1", NULL, &ipv4) );
         ASSERT_EQ(0, addr_resolve_or_parse_ip("127.0.0.1", NULL, NULL) );
-        ASSERT_EQ(0, addr_resolve_or_parse_ip("hello world", &ipv6, &ipv4) );
+        ASSERT_EQ(0, addr_resolve_or_parse_ip("resolve.hello.world", &ipv6, &ipv4) );
     }
     {
         SCOPED_TRACE("expect ipv4 for ipv4 host");
@@ -670,6 +670,19 @@ TEST_F(NC_Test, send)
             ASSERT_FALSE( this->remote.set_ip("asd", 27011) );
             ASSERT_FALSE( this->local.send(this->remote, "hello world") );
         }
+    }
+    {
+        SCOPED_TRACE("broken local ipv4 + good remote ipv4");
+
+        ASSERT_TRUE( this->local.set_ip("127.0.0.1", 27010) );
+        ASSERT_TRUE( this->local.set_net() );
+        ASSERT_TRUE( this->remote.set_ip("127.0.0.1", 27011) );
+
+        this->local.m_net->family = 0; // break it
+        ASSERT_FALSE( this->local.send(this->remote, "hello world") );
+
+        this->local.m_net->family = this->local.m_ip.family; // fix it
+        ASSERT_TRUE( this->local.send(this->remote, "hello world") );
     }
 }
 
