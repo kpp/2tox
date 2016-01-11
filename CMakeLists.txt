@@ -18,6 +18,11 @@ FEATURE_SUMMARY(WHAT ALL)
 
 #
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ") # TODO
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} ") # TODO
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ") # TODO
+set(CMAKE_CXX_FLAGS_COVERAGE "--coverage")
+
 include_directories(${CMAKE_SOURCE_DIR})
 add_subdirectory(toxcore/)
 add_subdirectory(toxdns/)

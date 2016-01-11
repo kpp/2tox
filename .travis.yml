@@ -1,0 +1,51 @@
+language: cpp
+
+compiler:
+  - gcc
+
+os:
+  - linux
+
+sudo: false
+cache:
+  apt: true
+  directories:
+    - $HOME/.cache/pip
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - gcc-4.8
+      - g++-4.8
+
+notifications:
+  email: false
+
+branches:
+  only:
+    - master
+    - develop
+    - /^.*travis.*$/
+
+env:
+  matrix:
+    - BUILD_TYPE=Debug
+    - BUILD_TYPE=Release
+    - BUILD_TYPE=Coverage
+
+before_install:
+  - if [ "$CXX" = "g++" ]; then export CXX="g++-4.8" CC="gcc-4.8" GCOV="gcov-4.8"; fi
+  - source .travis/${TRAVIS_OS_NAME}/before_install.sh
+
+before_script:
+  - mkdir -p build
+  - cd build
+  - cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+
+script:
+  - cmake --build . --target all -- --keep-going
+  - cmake --build . --target check
+
+after_success:
+  - if [ "$BUILD_TYPE" == "Coverage" ]; then ~/.local/bin/coveralls --repo_token "${COVERALLS_IO_TOKEN}" --gcov "$GCOV" --exclude build/gtest -E ".*CMake.*CompilerId.c" --gcov-options "\-lp" -r ../; fi
