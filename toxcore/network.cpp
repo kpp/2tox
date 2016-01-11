@@ -269,12 +269,12 @@ bool Socket::set_nonblock() const {
 }
 
 bool Socket::set_nosigpipe() const {
-    return 1;
+    return true; // FIXME not impletented. Maybe we should use MSG_NOSIGNAL instead?
 }
 
 bool Socket::set_reuseaddr() const {
     int set = 1;
-    return (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void*) &set, sizeof(set)) == 0);
+    return setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void*) &set, sizeof(set)) == 0;
 }
 
 bool Socket::set_dualstack() const
@@ -300,7 +300,7 @@ Networking_Core::Networking_Core() :
 Networking_Core::~Networking_Core()
 {
     if (family != 0)
-        kill_sock(sock.fd);
+        kill_sock(sock);
 }
 
 void Networking_Core::poll() const
@@ -314,7 +314,9 @@ void Networking_Core::poll() const
     uint8_t data[MAX_UDP_PACKET_SIZE];
     uint32_t length;
 
-    while (sock.recvfrom(&ip_port, data, &length, MAX_UDP_PACKET_SIZE, /*flags*/ 0) != -1)
+    Socket socket;
+    socket.fd = sock;
+    while (socket.recvfrom(&ip_port, data, &length, MAX_UDP_PACKET_SIZE, /*flags*/ 0) != -1)
     {
         if (length < 1) continue;
 
@@ -374,14 +376,9 @@ int set_socket_dualstack(sock_t sock)
 
 int sendpacket(Networking_Core* net, IP_Port ip_port, const uint8_t* data, uint16_t length)
 {
-    return net->sock.sendto(net->family, ip_port, data, length, /*flags*/ 0);
-}
-
-static int receivepacket(sock_t sock, IP_Port* ip_port, void* data, uint32_t* length)
-{
     Socket socket;
-    socket.fd = sock;
-    return socket.recvfrom(ip_port, data, length, MAX_UDP_PACKET_SIZE, 0);
+    socket.fd = net->sock;
+    return socket.sendto(net->family, ip_port, data, length, /*flags*/ 0);
 }
 
 void networking_registerhandler(Networking_Core* net, uint8_t byte, packet_handler_callback cb, void* object)
@@ -432,17 +429,18 @@ Networking_Core* new_networking_ex(IP ip, uint16_t port_from, uint16_t port_to, 
     if (networking_at_startup() != 0)
         return NULL;
 
-    Networking_Core* temp = new Networking_Core();
+    Networking_Core* net = new Networking_Core();
 
-    temp->family = ip.family;
-    temp->port = 0;
+    net->family = ip.family;
+    net->port = 0;
 
     size_t tx_rx_buff_size = 1024 * 1024 * 2;
-    temp->sock = Socket(temp->family, tx_rx_buff_size);
+    Socket net_socket(net->family, tx_rx_buff_size);
+    net->sock = net_socket.fd;
 
     /* Check for socket error. */
-    if ( !temp->sock.is_valid() ) {
-        kill_networking(temp);
+    if ( !net_socket.is_valid() ) {
+        kill_networking(net);
 
         if (error)
             *error = 1;
@@ -451,8 +449,8 @@ Networking_Core* new_networking_ex(IP ip, uint16_t port_from, uint16_t port_to, 
     }
 
     /* iOS UDP sockets are weird and apparently can SIGPIPE */
-    if ( !temp->sock.set_nosigpipe() ) {
-        kill_networking(temp);
+    if ( !net_socket.set_nosigpipe() ) {
+        kill_networking(net);
 
         if (error)
             *error = 1;
@@ -461,8 +459,8 @@ Networking_Core* new_networking_ex(IP ip, uint16_t port_from, uint16_t port_to, 
     }
 
     /* Set socket nonblocking. */
-    if ( !temp->sock.set_nonblock() ) {
-        kill_networking(temp);
+    if ( !net_socket.set_nonblock() ) {
+        kill_networking(net);
 
         if (error)
             *error = 1;
@@ -471,7 +469,7 @@ Networking_Core* new_networking_ex(IP ip, uint16_t port_from, uint16_t port_to, 
     }
 
     if (ip.family == AF_INET6) {
-        temp->sock.set_dualstack();
+        net_socket.set_dualstack();
 
         ipv6_mreq mreq;
         memset(&mreq, 0, sizeof(mreq));
@@ -480,7 +478,7 @@ Networking_Core* new_networking_ex(IP ip, uint16_t port_from, uint16_t port_to, 
         mreq.ipv6mr_multiaddr.s6_addr[15] = 0x01;
         mreq.ipv6mr_interface = 0;
 
-        setsockopt(temp->sock.fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
+        setsockopt(net_socket.fd, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, (char *)&mreq, sizeof(mreq));
 
        // LOGGER_DEBUG(res < 0 ? "Failed to activate local multicast membership. (%u, %s)" :
        //              "Local multicast group FF02::1 joined successfully", errno, strerror(errno) );
@@ -513,10 +511,10 @@ Networking_Core* new_networking_ex(IP ip, uint16_t port_from, uint16_t port_to, 
             port_to_try = port_from;
         ip_port.port = htons(port_to_try);
 
-        int res = temp->sock.bind(ip_port);
+        int res = net_socket.bind(ip_port);
 
         if (!res) {
-            temp->port = ip_port.port;
+            net->port = ip_port.port;
 
             //LOGGER_DEBUG("Bound successfully to %s:%u", ip_ntoa(&ip), ntohs(temp->port));
 
@@ -528,14 +526,14 @@ Networking_Core* new_networking_ex(IP ip, uint16_t port_from, uint16_t port_to, 
             if (error)
                 *error = 0;
 
-            return temp;
+            return net;
         }
     }
 
     //LOGGER_ERROR("Failed to bind socket: %u, %s IP: %s port_from: %u port_to: %u", errno, strerror(errno),
     //             ip_ntoa(&ip), port_from, port_to);
 
-    kill_networking(temp);
+    kill_networking(net);
 
     if (error)
         *error = 1;

@@ -149,7 +149,7 @@ struct Networking_Core {
     sa_family_t family;
     uint16_t port;
     /* Our UDP socket. */
-    Socket sock;
+    int sock;
 
     Networking_Core();
     ~Networking_Core();

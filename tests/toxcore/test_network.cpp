@@ -434,13 +434,80 @@ TEST(IP_Port, copy)
     }
 }
 
-TEST(Socket, valid)
+class Socket_Test : public ::testing::Test
+{
+    Networking_Core* m_net_ip4;
+    Networking_Core* m_net_ip6;
+public:
+    int good_ip4_socket;
+    int good_ip6_socket;
+    int bad_socket;
+
+    Socket_Test() {}
+    ~Socket_Test() {}
+
+    virtual void SetUp() {
+        IP ip;
+        int port;
+
+        ASSERT_EQ(1, addr_parse_ip("127.0.0.1", &ip));
+        port = 27012;
+        m_net_ip4 = new_networking(ip, port);
+        ASSERT_NE(reinterpret_cast<void*>(NULL), m_net_ip4);
+        good_ip4_socket = m_net_ip4->sock;
+
+        ASSERT_EQ(1, addr_parse_ip("::ffff:127.0.0.1", &ip));
+        port = 27013;
+        m_net_ip6 = new_networking(ip, port);
+        ASSERT_NE(reinterpret_cast<void*>(NULL), m_net_ip6);
+        good_ip6_socket = m_net_ip6->sock;
+
+        bad_socket = -1;
+    }
+    virtual void TearDown() {
+        kill_networking(m_net_ip4);
+        kill_networking(m_net_ip6);
+    }
+};
+
+TEST_F(Socket_Test, valid)
 {
     ASSERT_EQ(0, sock_valid(-1));
     ASSERT_EQ(1, sock_valid(0));
     ASSERT_EQ(1, sock_valid(1));
+
+    ASSERT_EQ(0, sock_valid(bad_socket));
+    ASSERT_EQ(1, sock_valid(good_ip4_socket));
+    ASSERT_EQ(1, sock_valid(good_ip6_socket));
 }
 
+TEST_F(Socket_Test, nonblock)
+{
+    ASSERT_FALSE( set_socket_nonblock(bad_socket) );
+    ASSERT_TRUE ( set_socket_nonblock(good_ip4_socket) );
+    ASSERT_TRUE ( set_socket_nonblock(good_ip6_socket) );
+}
+
+TEST_F(Socket_Test, nosigpipe)
+{
+    ASSERT_TRUE ( set_socket_nosigpipe(bad_socket) );
+    ASSERT_TRUE ( set_socket_nosigpipe(good_ip4_socket) );
+    ASSERT_TRUE ( set_socket_nosigpipe(good_ip6_socket) );
+}
+
+TEST_F(Socket_Test, reuseaddr)
+{
+    ASSERT_FALSE( set_socket_reuseaddr(bad_socket) );
+    ASSERT_TRUE ( set_socket_reuseaddr(good_ip4_socket) );
+    ASSERT_TRUE ( set_socket_reuseaddr(good_ip6_socket) );
+}
+
+TEST_F(Socket_Test, dualstack)
+{
+    ASSERT_FALSE( set_socket_dualstack(bad_socket) );
+    ASSERT_FALSE( set_socket_dualstack(good_ip4_socket) );
+    ASSERT_TRUE ( set_socket_dualstack(good_ip6_socket) );
+}
 
 class NC_Test /*NC = Networking_Core*/ : public ::testing::Test
 {
