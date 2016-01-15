@@ -6,6 +6,7 @@ enable_testing()
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 
 find_package(Threads REQUIRED)
+find_package(Sodium REQUIRED)
 
 include(CMakeDependentOption)
 include(FeatureSummary)
@@ -13,6 +14,11 @@ include(GTest)
 
 option(BUILD_TESTING "Build the testing tree." ON)
 ADD_FEATURE_INFO(BUILD_TESTING BUILD_TESTING "Build unit tests")
+
+SET_PACKAGE_PROPERTIES(Sodium PROPERTIES TYPE REQUIRED
+    URL "https://download.libsodium.org/doc/"
+    DESCRIPTION "Software library for encryption, decryption, signatures, password hashing and more"
+)
 
 FEATURE_SUMMARY(WHAT ALL)
 
@@ -24,6 +30,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} ") # TODO
 set(CMAKE_CXX_FLAGS_COVERAGE "--coverage")
 
 include_directories(${CMAKE_SOURCE_DIR})
+include_directories(${SODIUM_INCLUDE_DIR})
 add_subdirectory(toxcore/)
 add_subdirectory(toxdns/)
 add_subdirectory(toxencryptsave/)
