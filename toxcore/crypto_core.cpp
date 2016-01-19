@@ -4,6 +4,11 @@
 #include <sodium/utils.h>
 
 #include <arpa/inet.h>
+#include <limits>
+
+#if !(crypto_box_BEFORENMBYTES >= crypto_secretbox_KEYBYTES)
+  #error "crypto_box_beforenm will not work correctly"
+#endif
 
 int public_key_cmp(const uint8_t* pk1, const uint8_t* pk2)
 {
@@ -29,33 +34,63 @@ int public_key_valid(const uint8_t* public_key)
     return 0;
 }
 
+void encrypt_precompute(const uint8_t* public_key, const uint8_t* secret_key, uint8_t* precomputed_key)
+{
+    crypto_box_beforenm(precomputed_key, public_key, secret_key);
+}
+
+
 int encrypt_data(const uint8_t* public_key, const uint8_t* secret_key, const uint8_t* nonce,
                  const uint8_t* plain, uint32_t length, uint8_t* encrypted)
 {
-    return 0;
+    uint8_t precomputed_key[crypto_box_BEFORENMBYTES];
+    encrypt_precompute(public_key, secret_key, precomputed_key);
+
+    int ret = encrypt_data_symmetric(precomputed_key, nonce, plain, length, encrypted);
+
+    sodium_memzero(precomputed_key, sizeof precomputed_key);
+    return ret;
 }
+
+int encrypt_data_symmetric(const uint8_t* precomputed_key, const uint8_t* nonce, const uint8_t* plain, uint32_t length,
+                           uint8_t* encrypted)
+{
+    if (length == 0 || length > std::numeric_limits<size_t>::max() - crypto_box_MACBYTES)
+        return -1;
+
+    int ret = crypto_secretbox_detached(encrypted + crypto_box_MACBYTES /* cyphertext */ , encrypted /* MAC */,
+                                        plain, length, nonce, precomputed_key);
+    if (ret != 0)
+        return -1;
+
+    return length + crypto_box_MACBYTES;
+}
+
 
 int decrypt_data(const uint8_t* public_key, const uint8_t* secret_key, const uint8_t* nonce,
                  const uint8_t* encrypted, uint32_t length, uint8_t* plain)
 {
-    return 0;
+    uint8_t precomputed_key[crypto_box_BEFORENMBYTES];
+    encrypt_precompute(public_key, secret_key, precomputed_key);
+
+    int ret = decrypt_data_symmetric(precomputed_key, nonce, encrypted, length, plain);
+
+    sodium_memzero(precomputed_key, sizeof precomputed_key);
+    return ret;
 }
 
-void encrypt_precompute(const uint8_t* public_key, const uint8_t* secret_key, uint8_t* enc_key)
-{
-    return;
-}
-
-int encrypt_data_symmetric(const uint8_t* secret_key, const uint8_t* nonce, const uint8_t* plain, uint32_t length,
-                           uint8_t* encrypted)
-{
-    return 0;
-}
-
-int decrypt_data_symmetric(const uint8_t* secret_key, const uint8_t* nonce, const uint8_t* encrypted, uint32_t length,
+int decrypt_data_symmetric(const uint8_t* precomputed_key, const uint8_t* nonce, const uint8_t* encrypted, uint32_t length,
                            uint8_t* plain)
 {
-    return 0;
+    if (length < crypto_box_MACBYTES)
+        return -1;
+
+    int ret = crypto_secretbox_open_detached(plain, encrypted + crypto_box_MACBYTES /* cyphertext */ , encrypted /* MAC */,
+                                            length - crypto_box_MACBYTES, nonce, precomputed_key);
+    if (ret != 0)
+        return -1;
+
+    return length - crypto_box_MACBYTES;
 }
 
 void increment_nonce(uint8_t* nonce)
@@ -67,31 +102,35 @@ void increment_nonce(uint8_t* nonce)
      * are independent of user-controlled input (you may have heard of the Heartbleed bug).
      */
     uint32_t i = crypto_box_NONCEBYTES;
-    uint_fast16_t c = 1U;
+    uint_fast16_t carry = 1U;
     for (; i != 0; --i) {
-        c += (uint_fast16_t) nonce[i - 1];
-        nonce[i - 1] = (uint8_t) c;
-        c >>= 8;
+        carry += (uint_fast16_t) nonce[i - 1];
+        nonce[i - 1] = (uint8_t) carry;
+        carry >>= 8;
     }
 }
 
-void increment_nonce_number(uint8_t* nonce, uint32_t num)
+void increment_nonce_number(uint8_t* nonce, uint32_t host_order_num)
 {
     /* NOTE don't use breaks inside this loop
      * In particular, make sure, as far as possible,
      * that loop bounds and their potential underflow or overflow
      * are independent of user-controlled input (you may have heard of the Heartbleed bug).
      */
-    uint32_t big_endian_num = htonl(num);
-    uint8_t* num_vec = (uint8_t*) &big_endian_num;
-    uint8_t num_as_nonce[crypto_box_NONCEBYTES] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,num_vec[0],num_vec[1],num_vec[2],num_vec[3]};
+    const uint32_t big_endian_num = htonl(host_order_num);
+    const uint8_t* const num_vec = reinterpret_cast<const uint8_t*>( &big_endian_num );
+    uint8_t num_as_nonce[crypto_box_NONCEBYTES] = {0};
+    num_as_nonce[crypto_box_NONCEBYTES - 4] = num_vec[0];
+    num_as_nonce[crypto_box_NONCEBYTES - 3] = num_vec[1];
+    num_as_nonce[crypto_box_NONCEBYTES - 2] = num_vec[2];
+    num_as_nonce[crypto_box_NONCEBYTES - 1] = num_vec[3];
 
     uint32_t i = crypto_box_NONCEBYTES;
-    uint_fast16_t c = 0U;
+    uint_fast16_t carry = 0U;
     for (; i != 0; --i) {
-        c += (uint_fast16_t) nonce[i] + (uint_fast16_t) num_as_nonce[i];
-        nonce[i] = (unsigned char) c;
-        c >>= 8;
+        carry += (uint_fast16_t) nonce[i] + (uint_fast16_t) num_as_nonce[i];
+        nonce[i] = (unsigned char) carry;
+        carry >>= 8;
     }
 }
 
