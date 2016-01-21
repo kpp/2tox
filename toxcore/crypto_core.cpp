@@ -44,6 +44,9 @@ void encrypt_precompute(const uint8_t* public_key, const uint8_t* secret_key, ui
 int encrypt_data(const uint8_t* public_key, const uint8_t* secret_key, const uint8_t* nonce,
                  const uint8_t* plain, uint32_t length, uint8_t* encrypted)
 {
+    if (!public_key || !secret_key)
+        return -1;
+
     uint8_t precomputed_key[crypto_box_BEFORENMBYTES];
     encrypt_precompute(public_key, secret_key, precomputed_key);
 
@@ -56,7 +59,7 @@ int encrypt_data(const uint8_t* public_key, const uint8_t* secret_key, const uin
 int encrypt_data_symmetric(const uint8_t* precomputed_key, const uint8_t* nonce, const uint8_t* plain, uint32_t length,
                            uint8_t* encrypted)
 {
-    if (length == 0 || length > std::numeric_limits<size_t>::max() - crypto_box_MACBYTES)
+    if (length == 0 || length > std::numeric_limits<size_t>::max() - crypto_box_MACBYTES || !precomputed_key || !nonce || !plain || !encrypted)
         return -1;
 
     int ret = crypto_secretbox_detached(encrypted + crypto_box_MACBYTES /* cyphertext */ , encrypted /* MAC */,
@@ -71,6 +74,9 @@ int encrypt_data_symmetric(const uint8_t* precomputed_key, const uint8_t* nonce,
 int decrypt_data(const uint8_t* public_key, const uint8_t* secret_key, const uint8_t* nonce,
                  const uint8_t* encrypted, uint32_t length, uint8_t* plain)
 {
+    if (!public_key || !secret_key)
+        return -1;
+
     uint8_t precomputed_key[crypto_box_BEFORENMBYTES];
     encrypt_precompute(public_key, secret_key, precomputed_key);
 
@@ -83,7 +89,7 @@ int decrypt_data(const uint8_t* public_key, const uint8_t* secret_key, const uin
 int decrypt_data_symmetric(const uint8_t* precomputed_key, const uint8_t* nonce, const uint8_t* encrypted, uint32_t length,
                            uint8_t* plain)
 {
-    if (length < crypto_box_MACBYTES)
+    if (length < crypto_box_MACBYTES || !precomputed_key || !nonce || !encrypted || !plain)
         return -1;
 
     int ret = crypto_secretbox_open_detached(plain, encrypted + crypto_box_MACBYTES /* cyphertext */ , encrypted /* MAC */,
@@ -199,13 +205,13 @@ int create_request(const uint8_t* send_public_key, const uint8_t* send_secret_ke
     if (len == -1)
         return -1;
 
-    return len + 1 /* request_id */ + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES;
+    return len + 1 /*packet type*/ + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES;
 }
 
 int handle_request(const uint8_t* self_public_key, const uint8_t* self_secret_key, uint8_t* public_key, uint8_t* data,
                    uint8_t* request_id, const uint8_t* packet, uint16_t length)
 {
-    if (length <= crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + 1 + crypto_box_MACBYTES || length > MAX_CRYPTO_REQUEST_SIZE)
+    if (length <= 1 /*packet type*/ + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + crypto_box_MACBYTES || length > MAX_CRYPTO_REQUEST_SIZE)
         return -1;
 
     Packet_Pointers<const uint8_t*> packet_ptr(packet);
@@ -220,7 +226,7 @@ int handle_request(const uint8_t* self_public_key, const uint8_t* self_secret_ke
     uint8_t* const message_data = message + 1;
 
     const int message_length = decrypt_data(public_key, self_secret_key, packet_ptr.nonce, packet_ptr.cyphertext,
-                            length - (crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + 1), message);
+                            length - (1 /*packet type*/ + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES), message);
 
     if (message_length == -1 /*error during decryption*/ || message_length == 0 /*result message length must be > 1, the first byte is request_id*/)
         return -1;
