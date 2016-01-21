@@ -4,6 +4,7 @@
 #include <sodium/utils.h>
 
 #include <arpa/inet.h>
+#include <string.h>
 #include <limits>
 
 #if !(crypto_box_BEFORENMBYTES >= crypto_secretbox_KEYBYTES)
@@ -139,24 +140,94 @@ void random_nonce(uint8_t* nonce)
     randombytes_buf(nonce, crypto_box_NONCEBYTES);
 }
 
-void new_symmetric_key(uint8_t* key)
-{
-    return;
-}
-
 void new_nonce(uint8_t* nonce)
 {
     random_nonce(nonce);
 }
 
+void new_symmetric_key(uint8_t* key)
+{
+    randombytes(key, crypto_box_BEFORENMBYTES);
+}
+
+template<class PointerT>
+struct Packet_Pointers
+{
+    PointerT const type;
+    PointerT const recv_public_key;
+    PointerT const send_public_key;
+    PointerT const nonce;
+    PointerT const cyphertext;
+
+    explicit Packet_Pointers(PointerT const packet):
+        type( packet + 0 ),
+        recv_public_key( packet + 1 ),
+        send_public_key( packet + 1 + crypto_box_PUBLICKEYBYTES ),
+        nonce( packet + 1 + crypto_box_PUBLICKEYBYTES * 2 ),
+        cyphertext( packet + 1 + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES)
+    {}
+private:
+    Packet_Pointers(); // = delete
+    Packet_Pointers(const Packet_Pointers&); // = delete
+    Packet_Pointers& operator= (const Packet_Pointers&); // = delete
+};
+
 int create_request(const uint8_t* send_public_key, const uint8_t* send_secret_key, uint8_t* packet,
                    const uint8_t* recv_public_key, const uint8_t* data, uint32_t length, uint8_t request_id)
 {
-    return 0;
+    if (MAX_CRYPTO_REQUEST_SIZE < length + 1 + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + 1 +
+        crypto_box_MACBYTES)
+    return -1;
+
+    Packet_Pointers<uint8_t*> packet_ptr(packet);
+
+    *packet_ptr.type = NET_PACKET_CRYPTO;
+    memcpy(packet_ptr.recv_public_key, recv_public_key, crypto_box_PUBLICKEYBYTES);
+    memcpy(packet_ptr.send_public_key, send_public_key, crypto_box_PUBLICKEYBYTES);
+    new_nonce(packet_ptr.nonce);
+
+    uint8_t message[MAX_CRYPTO_REQUEST_SIZE];
+    uint8_t* const message_request_id = message + 0;
+    uint8_t* const message_data = message + 1;
+
+    *message_request_id = request_id;
+    memcpy(message_data, data, length);
+    const size_t message_length = length + 1 /* request_id */;
+
+    int len = encrypt_data(recv_public_key, send_secret_key, packet_ptr.nonce, message, message_length, packet_ptr.cyphertext);
+
+    if (len == -1)
+        return -1;
+
+    return len + 1 /* request_id */ + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES;
 }
 
 int handle_request(const uint8_t* self_public_key, const uint8_t* self_secret_key, uint8_t* public_key, uint8_t* data,
                    uint8_t* request_id, const uint8_t* packet, uint16_t length)
 {
-    return 0;
+    if (length <= crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + 1 + crypto_box_MACBYTES || length > MAX_CRYPTO_REQUEST_SIZE)
+        return -1;
+
+    Packet_Pointers<const uint8_t*> packet_ptr(packet);
+
+    if ( public_key_cmp(packet_ptr.recv_public_key, self_public_key) != 0)
+        return -1;
+
+    memcpy(public_key, packet_ptr.send_public_key, crypto_box_PUBLICKEYBYTES);
+
+    uint8_t message[MAX_CRYPTO_REQUEST_SIZE];
+    uint8_t* const message_request_id = message + 0;
+    uint8_t* const message_data = message + 1;
+
+    const int message_length = decrypt_data(public_key, self_secret_key, packet_ptr.nonce, packet_ptr.cyphertext,
+                            length - (crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + 1), message);
+
+    if (message_length == -1 /*error during decryption*/ || message_length == 0 /*result message length must be > 1, the first byte is request_id*/)
+        return -1;
+
+    *request_id = *message_request_id;
+    const size_t data_length = message_length - 1 /* request_id */;
+    memcpy(data, message_data, data_length);
+
+    return data_length;
 }

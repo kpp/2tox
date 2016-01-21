@@ -83,13 +83,25 @@ void increment_nonce_number(uint8_t* nonce, uint32_t host_order_num);
 /* Fill the given nonce with random bytes. */
 void random_nonce(uint8_t* nonce);
 
-/* Fill a key crypto_box_KEYBYTES big with random bytes */
-void new_symmetric_key(uint8_t* key);
-
 /*Gives a nonce guaranteed to be different from previous ones.*/
 void new_nonce(uint8_t* nonce);
 
+/* Fill a key crypto_box_KEYBYTES big with random bytes */
+void new_symmetric_key(uint8_t* key);
+
 #define MAX_CRYPTO_REQUEST_SIZE 1024
+
+// FIXME move constants somewhere else
+#define NET_PACKET_PING_REQUEST    0   /* Ping request packet ID. */
+#define NET_PACKET_PING_RESPONSE   1   /* Ping response packet ID. */
+#define NET_PACKET_GET_NODES       2   /* Get nodes request packet ID. */
+#define NET_PACKET_SEND_NODES_IPV6 4   /* Send nodes response packet ID for other addresses. */
+#define NET_PACKET_COOKIE_REQUEST  24  /* Cookie request packet */
+#define NET_PACKET_COOKIE_RESPONSE 25  /* Cookie response packet */
+#define NET_PACKET_CRYPTO_HS       26  /* Crypto handshake packet */
+#define NET_PACKET_CRYPTO_DATA     27  /* Crypto data packet */
+#define NET_PACKET_CRYPTO          32  /* Encrypted data packet ID. */
+#define NET_PACKET_LAN_DISCOVERY   33  /* LAN discovery packet ID. */
 
 #define CRYPTO_PACKET_FRIEND_REQ    32  /* Friend request crypto packet ID. */
 #define CRYPTO_PACKET_HARDENING     48  /* Hardening crypto packet ID. */

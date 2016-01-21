@@ -98,7 +98,7 @@ TEST(pub_key, cmp)
     }
 }
 
-TEST(encrypt_decrypt, simple)
+TEST(encrypt_decrypt, alice_bob)
 {
     sodium_init(); // for sodium_malloc
 
@@ -122,10 +122,11 @@ TEST(encrypt_decrypt, simple)
     size_t message_len = data.length();
     uint8_t* message = reinterpret_cast<uint8_t*>( sodium_malloc(message_len) );
 
-    ASSERT_EQ(cyphertext_len, encrypt_data(bob_publickey, alice_secretkey, nonce,
-                                           reinterpret_cast<const uint8_t*>(data.c_str()), data.length(), cyphertext) );
+    ASSERT_EQ(cyphertext_len, encrypt_data(bob_publickey, alice_secretkey, nonce, reinterpret_cast<const uint8_t*>(data.c_str()), data.length(), cyphertext) );
     ASSERT_EQ(message_len, decrypt_data(alice_publickey, bob_secretkey, nonce, cyphertext, cyphertext_len, message) );
 
     std::string message_str(reinterpret_cast<const char*>(message), message_len);
     ASSERT_EQ(data, message_str);
+
+    sodium_free(cyphertext);
 }
