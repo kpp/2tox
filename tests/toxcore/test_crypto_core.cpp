@@ -208,18 +208,66 @@ TEST(request, create_handle)
 
     const uint8_t request_id = 42;
 
+    {
+        SCOPED_TRACE("bad args to create request");
+        {
+            SCOPED_TRACE("too long data");
+            ASSERT_EQ(-1, create_request(alice_publickey, alice_secretkey, packet, bob_publickey, reinterpret_cast<const uint8_t*>(data.c_str()), MAX_CRYPTO_REQUEST_SIZE, request_id));
+        }
+        {
+            SCOPED_TRACE("null ptrs");
+            ASSERT_EQ(-1, create_request(alice_publickey, alice_secretkey, packet, bob_publickey, NULL, data.length(), request_id));
+            ASSERT_EQ(-1, create_request(alice_publickey, alice_secretkey, packet, NULL, reinterpret_cast<const uint8_t*>(data.c_str()), data.length(), request_id));
+            ASSERT_EQ(-1, create_request(alice_publickey, alice_secretkey, NULL, bob_publickey, reinterpret_cast<const uint8_t*>(data.c_str()), data.length(), request_id));
+            ASSERT_EQ(-1, create_request(alice_publickey, NULL, packet, bob_publickey, reinterpret_cast<const uint8_t*>(data.c_str()), data.length(), request_id));
+            ASSERT_EQ(-1, create_request(NULL, alice_secretkey, packet, bob_publickey, reinterpret_cast<const uint8_t*>(data.c_str()), data.length(), request_id));
+        }
+    }
     ASSERT_EQ(packet_len, create_request(alice_publickey, alice_secretkey, packet, bob_publickey, reinterpret_cast<const uint8_t*>(data.c_str()), data.length(), request_id));
 
-    uint8_t handled_request_id = 0;
-    uint8_t handled_publickey[crypto_box_PUBLICKEYBYTES] = {0};
-    ASSERT_EQ(message_len, handle_request(bob_publickey, bob_secretkey, handled_publickey, message, &handled_request_id, packet, packet_len));
-    ASSERT_EQ(NET_PACKET_CRYPTO, packet[0]);
+    {
+        SCOPED_TRACE("bad args to handle request");
+        {
+            SCOPED_TRACE("packet length");
+            uint8_t handled_request_id = 0;
+            uint8_t handled_publickey[crypto_box_PUBLICKEYBYTES] = {0};
+            ASSERT_EQ(-1, handle_request(bob_publickey, bob_secretkey, handled_publickey, message, &handled_request_id, packet, MAX_CRYPTO_REQUEST_SIZE + 42));
+            ASSERT_EQ(-1, handle_request(bob_publickey, bob_secretkey, handled_publickey, message, &handled_request_id, packet, 0));
+        }
+        {
+            SCOPED_TRACE("null ptrs");
+            uint8_t handled_request_id = 0;
+            uint8_t handled_publickey[crypto_box_PUBLICKEYBYTES] = {0};
+            ASSERT_EQ(-1, handle_request(bob_publickey, bob_secretkey, handled_publickey, message, &handled_request_id, NULL, packet_len));
+            ASSERT_EQ(-1, handle_request(bob_publickey, bob_secretkey, handled_publickey, message, NULL, packet, packet_len));
+            ASSERT_EQ(-1, handle_request(bob_publickey, bob_secretkey, handled_publickey, NULL, &handled_request_id, packet, packet_len));
+            ASSERT_EQ(-1, handle_request(bob_publickey, bob_secretkey, NULL, message, &handled_request_id, packet, packet_len));
+            ASSERT_EQ(-1, handle_request(bob_publickey, NULL, handled_publickey, message, &handled_request_id, packet, packet_len));
+            ASSERT_EQ(-1, handle_request(NULL, bob_secretkey, handled_publickey, message, &handled_request_id, packet, packet_len));
+        }
+        {
+            SCOPED_TRACE("wrong keys");
+            uint8_t handled_request_id = 0;
+            uint8_t handled_publickey[crypto_box_PUBLICKEYBYTES] = {0};
+            ASSERT_EQ(-1, handle_request(alice_publickey, bob_secretkey, handled_publickey, message, &handled_request_id, packet, packet_len));
+            ASSERT_EQ(-1, handle_request(bob_publickey, alice_secretkey, handled_publickey, message, &handled_request_id, packet, packet_len));
+            ASSERT_EQ(-1, handle_request(alice_publickey, alice_secretkey, handled_publickey, message, &handled_request_id, packet, packet_len));
+        }
+    }
+    {
+        SCOPED_TRACE("good args to handle request");
+        uint8_t handled_request_id = 0;
+        uint8_t handled_publickey[crypto_box_PUBLICKEYBYTES] = {0};
 
-    ASSERT_EQ(request_id, handled_request_id);
-    ASSERT_EQ(0, public_key_cmp(alice_publickey, handled_publickey));
+        ASSERT_EQ(message_len, handle_request(bob_publickey, bob_secretkey, handled_publickey, message, &handled_request_id, packet, packet_len));
+        ASSERT_EQ(NET_PACKET_CRYPTO, packet[0]);
 
-    std::string message_str(reinterpret_cast<const char*>(message), message_len);
-    ASSERT_EQ(data, message_str);
+        ASSERT_EQ(request_id, handled_request_id);
+        ASSERT_EQ(0, public_key_cmp(alice_publickey, handled_publickey));
+
+        std::string message_str(reinterpret_cast<const char*>(message), message_len);
+        ASSERT_EQ(data, message_str);
+    }
 
     free(packet);
     free(message);

@@ -181,9 +181,9 @@ private:
 int create_request(const uint8_t* send_public_key, const uint8_t* send_secret_key, uint8_t* packet,
                    const uint8_t* recv_public_key, const uint8_t* data, uint32_t length, uint8_t request_id)
 {
-    if (MAX_CRYPTO_REQUEST_SIZE < length + 1 + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + 1 +
-        crypto_box_MACBYTES)
-    return -1;
+    if (MAX_CRYPTO_REQUEST_SIZE < length + 1 + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + 1 + crypto_box_MACBYTES
+        || !send_public_key || !packet || !recv_public_key || !data)
+        return -1;
 
     Packet_Pointers<uint8_t*> packet_ptr(packet);
 
@@ -211,7 +211,8 @@ int create_request(const uint8_t* send_public_key, const uint8_t* send_secret_ke
 int handle_request(const uint8_t* self_public_key, const uint8_t* self_secret_key, uint8_t* public_key, uint8_t* data,
                    uint8_t* request_id, const uint8_t* packet, uint16_t length)
 {
-    if (length <= 1 /*packet type*/ + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + crypto_box_MACBYTES || length > MAX_CRYPTO_REQUEST_SIZE)
+    if (length <= 1 /*packet type*/ + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES + crypto_box_MACBYTES
+        || length > MAX_CRYPTO_REQUEST_SIZE || !self_public_key || !public_key || !data || !request_id || !packet)
         return -1;
 
     Packet_Pointers<const uint8_t*> packet_ptr(packet);
