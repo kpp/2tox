@@ -11,6 +11,17 @@
   #error "crypto_box_beforenm will not work correctly"
 #endif
 
+template<std::size_t BytesN>
+struct Secret_Stack_Buffer // zero data on destruction
+{
+    uint8_t ptr[BytesN];
+    Secret_Stack_Buffer() : ptr() {}
+    ~Secret_Stack_Buffer() { sodium_memzero(ptr, BytesN); }
+private:
+    Secret_Stack_Buffer(const Secret_Stack_Buffer&); // = delete
+    Secret_Stack_Buffer& operator= (const Secret_Stack_Buffer&); // = delete
+};
+
 int public_key_cmp(const uint8_t* pk1, const uint8_t* pk2)
 {
     return sodium_memcmp(pk1, pk2, crypto_box_PUBLICKEYBYTES);
@@ -47,13 +58,10 @@ int encrypt_data(const uint8_t* public_key, const uint8_t* secret_key, const uin
     if (!public_key || !secret_key)
         return -1;
 
-    uint8_t precomputed_key[crypto_box_BEFORENMBYTES];
-    encrypt_precompute(public_key, secret_key, precomputed_key);
+    Secret_Stack_Buffer<crypto_box_BEFORENMBYTES> precomputed_key;
+    encrypt_precompute(public_key, secret_key, precomputed_key.ptr);
 
-    int ret = encrypt_data_symmetric(precomputed_key, nonce, plain, length, encrypted);
-
-    sodium_memzero(precomputed_key, sizeof precomputed_key);
-    return ret;
+    return encrypt_data_symmetric(precomputed_key.ptr, nonce, plain, length, encrypted);
 }
 
 int encrypt_data_symmetric(const uint8_t* precomputed_key, const uint8_t* nonce, const uint8_t* plain, uint32_t length,
@@ -77,13 +85,10 @@ int decrypt_data(const uint8_t* public_key, const uint8_t* secret_key, const uin
     if (!public_key || !secret_key)
         return -1;
 
-    uint8_t precomputed_key[crypto_box_BEFORENMBYTES];
-    encrypt_precompute(public_key, secret_key, precomputed_key);
+    Secret_Stack_Buffer<crypto_box_BEFORENMBYTES> precomputed_key;
+    encrypt_precompute(public_key, secret_key, precomputed_key.ptr);
 
-    int ret = decrypt_data_symmetric(precomputed_key, nonce, encrypted, length, plain);
-
-    sodium_memzero(precomputed_key, sizeof precomputed_key);
-    return ret;
+    return decrypt_data_symmetric(precomputed_key.ptr, nonce, encrypted, length, plain);
 }
 
 int decrypt_data_symmetric(const uint8_t* precomputed_key, const uint8_t* nonce, const uint8_t* encrypted, uint32_t length,
@@ -192,15 +197,15 @@ int create_request(const uint8_t* send_public_key, const uint8_t* send_secret_ke
     memcpy(packet_ptr.send_public_key, send_public_key, crypto_box_PUBLICKEYBYTES);
     new_nonce(packet_ptr.nonce);
 
-    uint8_t message[MAX_CRYPTO_REQUEST_SIZE];
-    uint8_t* const message_request_id = message + 0;
-    uint8_t* const message_data = message + 1;
+    Secret_Stack_Buffer<MAX_CRYPTO_REQUEST_SIZE> message;
+    uint8_t* const message_request_id = message.ptr + 0;
+    uint8_t* const message_data = message.ptr + 1;
 
     *message_request_id = request_id;
     memcpy(message_data, data, length);
     const size_t message_length = length + 1 /* request_id */;
 
-    int len = encrypt_data(recv_public_key, send_secret_key, packet_ptr.nonce, message, message_length, packet_ptr.cyphertext);
+    int len = encrypt_data(recv_public_key, send_secret_key, packet_ptr.nonce, message.ptr, message_length, packet_ptr.cyphertext);
 
     if (len == -1)
         return -1;
@@ -222,12 +227,12 @@ int handle_request(const uint8_t* self_public_key, const uint8_t* self_secret_ke
 
     memcpy(public_key, packet_ptr.send_public_key, crypto_box_PUBLICKEYBYTES);
 
-    uint8_t message[MAX_CRYPTO_REQUEST_SIZE];
-    uint8_t* const message_request_id = message + 0;
-    uint8_t* const message_data = message + 1;
+    Secret_Stack_Buffer<MAX_CRYPTO_REQUEST_SIZE> message;
+    uint8_t* const message_request_id = message.ptr + 0;
+    uint8_t* const message_data = message.ptr + 1;
 
     const int message_length = decrypt_data(public_key, self_secret_key, packet_ptr.nonce, packet_ptr.cyphertext,
-                            length - (1 /*packet type*/ + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES), message);
+                            length - (1 /*packet type*/ + crypto_box_PUBLICKEYBYTES * 2 + crypto_box_NONCEBYTES), message.ptr);
 
     if (message_length == -1 /*error during decryption*/ || message_length == 0 /*result message length must be > 1, the first byte is request_id*/)
         return -1;

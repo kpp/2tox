@@ -184,7 +184,7 @@ TEST(encrypt_decrypt, alice_bob)
     free(message);
 }
 
-TEST(request, create_handle)
+TEST(request, create_and_handle)
 {
     uint8_t alice_publickey[crypto_box_PUBLICKEYBYTES] = {0};
     uint8_t alice_secretkey[crypto_box_SECRETKEYBYTES] = {0};
