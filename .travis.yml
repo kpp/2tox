@@ -41,7 +41,7 @@ before_install:
 before_script:
   - mkdir -p build
   - cd build
-  - cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE}
+  - cmake .. -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DCMAKE_PREFIX_PATH=${DEPS_PREFIX_PATH}
 
 script:
   - cmake --build . --target all -- --keep-going
