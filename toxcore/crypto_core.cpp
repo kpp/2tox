@@ -94,7 +94,7 @@ int decrypt_data(const uint8_t* public_key, const uint8_t* secret_key, const uin
 int decrypt_data_symmetric(const uint8_t* precomputed_key, const uint8_t* nonce, const uint8_t* encrypted, uint32_t length,
                            uint8_t* plain)
 {
-    if (length < crypto_box_MACBYTES || !precomputed_key || !nonce || !encrypted || !plain)
+    if (length <= crypto_box_MACBYTES || !precomputed_key || !nonce || !encrypted || !plain)
         return -1;
 
     int ret = crypto_secretbox_open_detached(plain, encrypted + crypto_box_MACBYTES /* cyphertext */ , encrypted /* MAC */,
