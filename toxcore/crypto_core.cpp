@@ -140,8 +140,8 @@ void increment_nonce_number(uint8_t* nonce, uint32_t host_order_num)
     uint32_t i = crypto_box_NONCEBYTES;
     uint_fast16_t carry = 0U;
     for (; i != 0; --i) {
-        carry += (uint_fast16_t) nonce[i] + (uint_fast16_t) num_as_nonce[i];
-        nonce[i] = (unsigned char) carry;
+        carry += (uint_fast16_t) nonce[i - 1] + (uint_fast16_t) num_as_nonce[i - 1];
+        nonce[i - 1] = (unsigned char) carry;
         carry >>= 8;
     }
 }

@@ -66,6 +66,39 @@ TEST(nonce, increment_number)
         increment_nonce_number(nonce, 0xf00000);
         ASSERT_STREQ("000000000000000000000000000000000000000100000000", nonce_to_string(nonce).c_str());
     }
+    {
+        SCOPED_TRACE("memory overlapping");
+        uint8_t mem[crypto_box_NONCEBYTES + 2] = {0}; // we will check 1 bytes before nonce and 1 byte after nonce
+
+        // set each byte of mem to '1' to detect mem overlapping
+        for(uint8_t* byte = mem; byte < mem + sizeof(mem); ++byte) {
+            *byte = 1;
+        }
+
+        uint8_t* byte_before = mem + 0;
+        uint8_t* nonce = mem + 1;
+        uint8_t* byte_after = mem + crypto_box_NONCEBYTES + 1;
+
+        // set each byte of nonce to 0xff
+        for(uint8_t* byte = nonce; byte < nonce + crypto_box_NONCEBYTES; ++byte) {
+            *byte = 0xff;
+        }
+
+        ASSERT_EQ(1, *byte_before);
+        ASSERT_EQ(1, *byte_after);
+
+        increment_nonce_number(nonce, 1);
+
+        {
+            SCOPED_TRACE("check bytes before and after");
+            ASSERT_EQ(1, *byte_before);
+            ASSERT_EQ(1, *byte_after);
+        }
+        {
+            SCOPED_TRACE("check nonce");
+            ASSERT_STREQ("000000000000000000000000000000000000000000000000", nonce_to_string(nonce).c_str());
+        }
+    }
 }
 
 TEST(pub_key, cmp)
