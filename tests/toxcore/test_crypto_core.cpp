@@ -68,17 +68,19 @@ TEST(nonce, increment_number)
     }
     {
         SCOPED_TRACE("memory overlapping");
-        uint8_t mem[crypto_box_NONCEBYTES + 2] = {0}; // we will check 1 bytes before nonce and 1 byte after nonce
+        // we will check increment_nonce_number not to access memory before and after nonce:
+        // [byte_before][n][o][n][c][e][...][byte_after]
+        // set byte_before and byte_after to 1, the value should not ever change
+        // set each byte of nonce to 0xff to increment every byte of nonce
 
-        // set each byte of mem to '1' to detect mem overlapping
-        for(uint8_t* byte = mem; byte < mem + sizeof(mem); ++byte) {
-            *byte = 1;
-        }
+        uint8_t mem[crypto_box_NONCEBYTES + 2] = {0}; // we will check 1 bytes before nonce and 1 byte after nonce
 
         uint8_t* byte_before = mem + 0;
         uint8_t* nonce = mem + 1;
         uint8_t* byte_after = mem + crypto_box_NONCEBYTES + 1;
 
+        *byte_before = 1;
+        *byte_after = 1;
         // set each byte of nonce to 0xff
         for(uint8_t* byte = nonce; byte < nonce + crypto_box_NONCEBYTES; ++byte) {
             *byte = 0xff;
@@ -90,7 +92,7 @@ TEST(nonce, increment_number)
         increment_nonce_number(nonce, 1);
 
         {
-            SCOPED_TRACE("check bytes before and after");
+            SCOPED_TRACE("check bytes before and after were not changed");
             ASSERT_EQ(1, *byte_before);
             ASSERT_EQ(1, *byte_after);
         }
