@@ -1,5 +1,5 @@
 # 2tox /biːtɒks/
-Reinplementation of toxcore
+Reimplementation of toxcore
 
 Branches
 ========
