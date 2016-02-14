@@ -1,13 +1,13 @@
 #ifndef TOXENCRYPTSAVE_CONSTANTS_H
 #define TOXENCRYPTSAVE_CONSTANTS_H
 
-#include <stddef.h>
+#include <cstddef>
 #include <stdint.h>
 
 // hardcoded constants
 // if they change, userdata will be lost
 
-#define TOXENCRYPTSAVE_MAGIC_NUMBER "toxEsave"
+#define TOXENCRYPTSAVE_MAGIC_HEADER "toxEsave"
 #define TOXENCRYPTSAVE_MAGIC_LENGTH 8U
 
 #define TOXENCRYPTSAVE_SALT_LENGTH 32U

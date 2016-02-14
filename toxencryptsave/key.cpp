@@ -6,12 +6,12 @@
 
 #define SET_ERROR_PARAMETER(param, x) {if(param) {*param = x;}}
 
-bool TOX_PASS_KEY::derive_from_pass_with_salt(uint8_t* passphrase, size_t pplength, const uint8_t* new_salt, TOX_ERR_KEY_DERIVATION* error)
+bool TOX_PASS_KEY::derive_from_pass_with_salt(uint8_t* passphrase, size_t pplength, const uint8_t* new_salt, TOX_ERR_KEY_DERIVATION* out_error)
 {
     toxencryptsave::Mem_Guard pass_guard(passphrase, pplength);
 
     if (!new_salt || (!passphrase && pplength != 0)) {
-        SET_ERROR_PARAMETER(error, TOX_ERR_KEY_DERIVATION_NULL);
+        SET_ERROR_PARAMETER(out_error, TOX_ERR_KEY_DERIVATION_NULL);
         return false;
     }
 
@@ -31,19 +31,19 @@ bool TOX_PASS_KEY::derive_from_pass_with_salt(uint8_t* passphrase, size_t ppleng
                 crypto_pwhash_scryptsalsa208sha256_OPSLIMIT_INTERACTIVE * 2, /* slightly stronger */
                 crypto_pwhash_scryptsalsa208sha256_MEMLIMIT_INTERACTIVE) != 0) {
         /* out of memory most likely */
-        SET_ERROR_PARAMETER(error, TOX_ERR_KEY_DERIVATION_FAILED);
+        SET_ERROR_PARAMETER(out_error, TOX_ERR_KEY_DERIVATION_FAILED);
         return false;
     }
 
-    SET_ERROR_PARAMETER(error, TOX_ERR_KEY_DERIVATION_OK);
+    SET_ERROR_PARAMETER(out_error, TOX_ERR_KEY_DERIVATION_OK);
     return true;
 }
 
-bool TOX_PASS_KEY::derive_from_pass_with_random_salt(uint8_t* passphrase, size_t pplength, TOX_ERR_KEY_DERIVATION* error)
+bool TOX_PASS_KEY::derive_from_pass_with_random_salt(uint8_t* passphrase, size_t pplength, TOX_ERR_KEY_DERIVATION* out_error)
 {
     toxencryptsave::Mem_Guard pass_guard(passphrase, pplength);
     uint8_t salt[toxencryptsave::constants::salt_len];
     randombytes(salt, sizeof salt);
-    return this->derive_from_pass_with_salt(pass_guard.ptr, pplength, salt, error);
+    return this->derive_from_pass_with_salt(pass_guard.ptr, pplength, salt, out_error);
 }
 

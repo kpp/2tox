@@ -18,10 +18,10 @@ struct Reader
     bool magic_is_valid() const;
 
     bool extract_salt_into(uint8_t* const out_salt) const;
-    bool extract_key_into(uint8_t* const passphrase, size_t pplength, TOX_PASS_KEY* const out_key, TOX_ERR_KEY_DERIVATION* error) const;
+    bool extract_key_into(uint8_t* const passphrase, size_t pplength, TOX_PASS_KEY* const out_key, TOX_ERR_KEY_DERIVATION* out_error) const;
 
-    bool decrypt_by_key(size_t data_length, const TOX_PASS_KEY* key, uint8_t* out, TOX_ERR_DECRYPTION* error) const;
-    bool decrypt_by_passphrase(size_t data_length, uint8_t* passphrase, size_t pplength, uint8_t* out, TOX_ERR_DECRYPTION* error) const;
+    bool decrypt_by_key(size_t data_length, const TOX_PASS_KEY* key, uint8_t* out, TOX_ERR_DECRYPTION* out_error) const;
+    bool decrypt_by_passphrase(size_t data_length, uint8_t* passphrase, size_t pplength, uint8_t* out, TOX_ERR_DECRYPTION* out_error) const;
 
 private:
     Reader(); // = delete

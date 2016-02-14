@@ -1,7 +1,7 @@
 #ifndef TOXENCRYPTSAVE_ERROR_STATUS_H
 #define TOXENCRYPTSAVE_ERROR_STATUS_H
 
-typedef enum TOX_ERR_KEY_DERIVATION {
+enum TOX_ERR_KEY_DERIVATION {
     TOX_ERR_KEY_DERIVATION_OK,
     /**
      * Some input data, or maybe the output pointer, was null.
@@ -13,9 +13,9 @@ typedef enum TOX_ERR_KEY_DERIVATION {
      * do not produce this error.
      */
     TOX_ERR_KEY_DERIVATION_FAILED
-} TOX_ERR_KEY_DERIVATION;
+};
 
-typedef enum TOX_ERR_ENCRYPTION {
+enum TOX_ERR_ENCRYPTION {
     TOX_ERR_ENCRYPTION_OK,
     /**
      * Some input data, or maybe the output pointer, was null.
@@ -31,9 +31,9 @@ typedef enum TOX_ERR_ENCRYPTION {
      * The encryption itself failed.
      */
     TOX_ERR_ENCRYPTION_FAILED
-} TOX_ERR_ENCRYPTION;
+};
 
-typedef enum TOX_ERR_DECRYPTION {
+enum TOX_ERR_DECRYPTION {
     TOX_ERR_DECRYPTION_OK,
     /**
      * Some input data, or maybe the output pointer, was null.
@@ -59,6 +59,6 @@ typedef enum TOX_ERR_DECRYPTION {
      * corrupt or the password/key was incorrect.
      */
     TOX_ERR_DECRYPTION_FAILED
-} TOX_ERR_DECRYPTION;
+};
 
 #endif

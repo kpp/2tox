@@ -2,7 +2,7 @@
 
 #include <sodium.h>
 
-const char* toxencryptsave::constants::magic = TOXENCRYPTSAVE_MAGIC_NUMBER;
+const char* toxencryptsave::constants::magic = TOXENCRYPTSAVE_MAGIC_HEADER;
 
 #if TOXENCRYPTSAVE_SALT_LENGTH != crypto_pwhash_scryptsalsa208sha256_SALTBYTES
 #error TOXENCRYPTSAVE_SALT_LENGTH is assumed to be equal to crypto_pwhash_scryptsalsa208sha256_SALTBYTES

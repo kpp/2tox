@@ -15,8 +15,8 @@ struct Writer /* encryptsave data writer */
         rw_data( raw_encryptsave_data )
     {}
 
-    bool encrypt_by_key(const uint8_t* data, size_t data_length, const TOX_PASS_KEY* key, TOX_ERR_ENCRYPTION* error) const;
-    bool encrypt_by_passphrase(const uint8_t* data, size_t data_length, uint8_t* passphrase, size_t pplength, TOX_ERR_ENCRYPTION* error) const;
+    bool encrypt_by_key(const uint8_t* data, size_t data_length, const TOX_PASS_KEY* key, TOX_ERR_ENCRYPTION* out_error) const;
+    bool encrypt_by_passphrase(const uint8_t* data, size_t data_length, uint8_t* passphrase, size_t pplength, TOX_ERR_ENCRYPTION* out_error) const;
 
 private:
     Writer(); // = delete

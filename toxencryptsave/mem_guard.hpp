@@ -1,7 +1,7 @@
 #ifndef TOXENCRYPTSAVE_MEM_GUARD_H
 #define TOXENCRYPTSAVE_MEM_GUARD_H
 
-#include <stddef.h>
+#include <cstddef>
 #include <stdint.h>
 
 namespace toxencryptsave
